@@ -9,9 +9,14 @@ __author__="Mike Shultz <mike@votesmart.org>"
 __copyright__="Copyright (c) 2017 Vote Smart"
 __version__="0.0.2"
 
-import os, sys, argparse, socket, configparser, fasteners
+import os, sys, argparse, socket, fasteners
 from subprocess import Popen, PIPE
 from envelopes import Envelope
+
+try:
+    import configparser
+except ImportError:
+    import ConfigParser as configparser
 
 try:
     from StringIO import StringIO
@@ -24,6 +29,7 @@ def main():
     # Handle command line args
     parser = argparse.ArgumentParser(description='A wrapper for handling multi-archive backups with Borg')
     parser.add_argument('--dry-run', action='store_true', dest="dryrun", help="Do not actually create archives.")
+    parser.add_argument('--remote-path', dest="remote_path", help="The remote path to the borg executable")
     parser.add_argument('-v', '--verbose', action='store_true', dest="verbose", help="Show output")
     parser.add_argument('-d', '--debug', action='store_true', dest="debug", help="Show debug output")
     parser.add_argument('-l', '--lock-file', dest="lockfile", default=u"/tmp/undine.lock", help="Lock file to use")
@@ -36,6 +42,13 @@ def main():
             return conf
         except configparser.NoSectionError:
             return default
+
+    # Deal with Python 2 and 3 differences in configparser
+    def config_get(parser, section, option, default=None):
+        if sys.version_info[0] == 2:
+            return parser.get(section, option, default)
+        else:
+            return parser.get(section, option, fallback=default)
 
     # Config handling. 
     config_file = ""
@@ -54,16 +67,16 @@ def main():
     config = {
         'debug': get_bool_config('default', 'debug'),
         'verbose': False,
-        'repos': parser.get('default', 'repos', fallback='ssh://rsync//data1/home/9774/file0.ia.votesmart.org'),
-        'notify_email': parser.get('default', 'notify_email', fallback='root@votesmart.org'),
-        'lockfile': parser.get('default', 'lockfile', fallback=None) or args.lockfile,
+        'repos': config_get(parser, 'default', 'repos', 'ssh://rsync//data1/home/9774/file0.ia.votesmart.org'),
+        'notify_email': config_get(parser, 'default', 'notify_email', 'root@votesmart.org'),
+        'lockfile': config_get(parser, 'default', 'lockfile', None) or args.lockfile,
         'units': dict(parser.items('units')),
-        'hostname': parser.get('default', 'hostname', fallback=socket.gethostname()),
-        'smtp_host': parser.get('smtp', 'host', fallback='localhost'),
-        'smtp_port': parser.get('smtp', 'port', fallback='589'),
-        'smtp_login': parser.get('smtp', 'login', fallback=None),
-        'smtp_password': parser.get('smtp', 'password', fallback=None),
-        'smtp_tls': parser.get('smtp', 'tls', fallback=True),
+        'hostname': config_get(parser, 'default', 'hostname', socket.gethostname()),
+        'smtp_host': config_get(parser, 'smtp', 'host', 'localhost'),
+        'smtp_port': config_get(parser, 'smtp', 'port', '589'),
+        'smtp_login': config_get(parser, 'smtp', 'login', None),
+        'smtp_password': config_get(parser, 'smtp', 'password', None),
+        'smtp_tls': config_get(parser, 'smtp', 'tls', True),
     }
 
     # debug turns on verbose
@@ -84,6 +97,8 @@ def main():
         extra_args = ""
         if args.dryrun:
             extra_args += "-n"
+        if hasattr(args, 'remote_path'):
+            extra_args += "--remote-path=%s" % args.remote_path
 
         for name,path in config['units'].items():
 
