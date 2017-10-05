@@ -26,6 +26,23 @@ insance, if using rsync.net, you could do something like the following:
             IdentityFile /home/user/.ssh/id_rsa.rsync.net
             User 123
 
+## Installation
+
+First, python must be available on your system(2.7 or 3.4+).  
+[Borg](https://www.borgbackup.org/) must also be installed.
+
+Then install undine like so:
+
+    python setup.py install
+
+## Borg Setup
+
+The repositories that undine will use(the `repos` argument in the ini) need to 
+be initialized before any backups can use the repository.  I like to create a 
+repository for each system.  This might be how you would want to init your repos:
+
+    borg init --remote-path=borg1  rsync.net:this.example.org
+
 ## Configuration
 
 Configuration is done through an INI file.  It can be placed in 
@@ -35,8 +52,9 @@ directory will take precidence.  The available options are below:
     [default]
     debug = False
     verbose = False
-    repos = 'ssh://rsync.net/path/to/repos'
-    notify_email = 'root@example.org'
+    hostname = this.example.org
+    repos = ssh://rsync.net/path/to/repos
+    notify_email = root@example.org
     lockfile = /tmp/undine.lock
 
     [smtp]
